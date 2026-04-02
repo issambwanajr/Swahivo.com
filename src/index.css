@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Fraunces:wght@300;400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces", serif;
+
+  --color-bg: #0d0d0f;
+  --color-surface: #16161a;
+  --color-surface-2: #1e1e24;
+  --color-surface-3: #26262e;
+  --color-border-subtle: rgba(255, 255, 255, 0.07);
+  --color-border-muted: rgba(255, 255, 255, 0.12);
+  --color-text-main: #f0eff4;
+  --color-text-muted: #9997a8;
+  --color-text-dim: #5e5c6e;
+  --color-accent: #6c63ff;
+  --color-accent-light: #a78bfa;
+
+  --radius-r: 14px;
+  --radius-r-sm: 8px;
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-text-main font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .reveal {
+    @apply opacity-0 translate-y-6 transition-all duration-500 ease-out;
+  }
+  .reveal.visible {
+    @apply opacity-100 translate-y-0;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+  }
+}
