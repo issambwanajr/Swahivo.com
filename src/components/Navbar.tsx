@@ -1,9 +1,18 @@
 import React from 'react';
+import { Sun, Moon } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
-export function Navbar({ onLoginClick }: { onLoginClick?: () => void }) {
+export function Navbar({ 
+  onLoginClick, 
+  theme, 
+  onThemeToggle 
+}: { 
+  onLoginClick?: () => void;
+  theme?: 'light' | 'dark';
+  onThemeToggle?: () => void;
+}) {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[200] h-14 flex items-center justify-between px-4 bg-bg">
+    <nav className="fixed top-0 left-0 right-0 z-[200] h-14 flex items-center justify-between px-4 bg-bg border-b border-border-subtle">
       <div className="flex items-center gap-2 cursor-pointer hover:bg-surface-2 px-3 py-1.5 rounded-lg transition-colors group">
         <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-black shadow-sm group-hover:scale-105 transition-transform">
           <span className="font-bold text-[1.1rem]">S</span>
@@ -13,16 +22,11 @@ export function Navbar({ onLoginClick }: { onLoginClick?: () => void }) {
 
       <div className="flex items-center gap-2">
         <button 
-          onClick={onLoginClick}
-          className="px-3 py-1.5 rounded-lg text-[0.88rem] font-medium text-text-main hover:bg-surface-2 transition-colors"
+          onClick={onThemeToggle}
+          className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors mr-2"
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
         >
-          Log in
-        </button>
-        <button 
-          onClick={onLoginClick}
-          className="px-3 py-1.5 rounded-full bg-white text-black text-[0.88rem] font-medium hover:bg-white/90 transition-colors"
-        >
-          Sign up for free
+          {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
         </button>
       </div>
     </nav>
