@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { AdminPanel } from './components/Admin/AdminPanel';
-import { getCurrentUser } from './lib/auth';
-import { User } from './types';
+import { AuthProvider, useAuth } from './components/Firebase/AuthProvider';
+import { Login } from './components/Auth/Login';
 
-export default function App() {
-  const [user, setUser] = useState<User | null>(getCurrentUser());
+function AppContent() {
+  const { user, loading, logout } = useAuth();
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('swahivo_theme');
@@ -27,17 +27,38 @@ export default function App() {
     if (params.get('admin') === 'true') {
       setIsAdminRoute(true);
     }
-
-    // Check for logged in user (local storage)
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center text-white">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-white"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   if (isAdminRoute) {
     return <AdminPanel />;
   }
 
-  return <Dashboard user={user || getCurrentUser()!} theme={theme} onThemeToggle={() => setTheme(t => t === 'light' ? 'dark' : 'light')} />;
+  return (
+    <Dashboard 
+      user={user} 
+      theme={theme} 
+      onThemeToggle={() => setTheme(t => t === 'light' ? 'dark' : 'light')} 
+      onLogout={logout}
+    />
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }

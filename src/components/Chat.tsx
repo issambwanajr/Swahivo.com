@@ -69,6 +69,9 @@ export function Chat() {
           await ai.models.embedContent({
             model: 'gemini-embedding-2-preview',
             contents: [content],
+            config: {
+              outputDimensionality: 512
+            }
           });
           console.log("Gemini Embedding 2: Content embedded successfully for context analysis.");
         } catch (embedError) {

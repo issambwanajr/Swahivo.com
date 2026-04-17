@@ -64,7 +64,7 @@ export function AdminPanel() {
               />
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
-            <button type="submit" className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-white/90 transition-all active:scale-95">
+            <button type="submit" className="w-full py-3 bg-accent text-white font-bold rounded-xl hover:bg-accent-dark transition-all active:scale-95">
               Login as Admin
             </button>
           </form>
@@ -135,7 +135,7 @@ export function AdminPanel() {
                     </span>
                   </td>
                   <td className="px-6 py-6 text-text-muted text-sm">
-                    {new Date(u.createdAt).toLocaleDateString()}
+                    {new Date(u.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-6 text-right">
                     <button 

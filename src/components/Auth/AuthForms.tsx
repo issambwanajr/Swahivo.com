@@ -40,7 +40,7 @@ export function AuthForms({ onSuccess, initialMode = 'login' }: AuthFormsProps) 
       name,
       password,
       role: 'user',
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     setStoredUsers([...users, newUser]);

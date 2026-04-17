@@ -1,24 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Fraunces:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&display=swap');
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
   --font-serif: "Fraunces", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --color-bg: #0d0d0f;
-  --color-surface: #16161a;
-  --color-surface-2: #1e1e24;
-  --color-surface-3: #26262e;
-  --color-border-subtle: rgba(255, 255, 255, 0.07);
-  --color-border-muted: rgba(255, 255, 255, 0.12);
-  --color-text-main: #f0eff4;
-  --color-text-muted: #9997a8;
-  --color-text-dim: #5e5c6e;
-  --color-accent: #6c63ff;
-  --color-accent-light: #a78bfa;
+  --color-bg: #171717;
+  --color-main-bg: #212121;
+  --color-surface: #2f2f2f;
+  --color-surface-2: #383838;
+  --color-surface-3: #424242;
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-border-muted: rgba(255, 255, 255, 0.1);
+  --color-text-main: #ececec;
+  --color-text-muted: #b4b4b4;
+  --color-text-dim: #9b9b9b;
+  --color-accent: #3b82f6;
+  --color-accent-dark: #2563eb;
 
-  --radius-r: 14px;
+  --radius-r: 12px;
   --radius-r-sm: 8px;
 }
 
@@ -37,6 +40,21 @@
 }
 
 @layer base {
+  .prose {
+    --tw-prose-body: var(--color-text-main);
+    --tw-prose-headings: var(--color-text-main);
+    --tw-prose-links: var(--color-accent);
+    --tw-prose-bold: var(--color-text-main);
+    --tw-prose-counters: var(--color-text-dim);
+    --tw-prose-bullets: var(--color-accent);
+    --tw-prose-hr: var(--color-border-muted);
+    @apply font-sans;
+  }
+  
+  .prose-serif {
+    @apply font-serif leading-relaxed text-[1.1rem];
+  }
+
   body {
     @apply bg-bg text-text-main font-sans antialiased transition-colors duration-300;
     scrollbar-width: thin;

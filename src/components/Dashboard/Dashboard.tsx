@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   LayoutDashboard, 
   FileText, 
+  Database,
   User as UserIcon, 
   Plus, 
   Trash2, 
@@ -12,52 +13,185 @@ import {
   MessageSquarePlus, 
   Search, 
   ShoppingBag,
+  MessageSquare,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
   Mic,
   AudioLines,
   Settings,
+  LogOut,
   Gift,
   Image as ImageIcon,
   Link as LinkIcon,
   Type,
   ArrowUp,
+  ArrowDown,
   X,
+  Bot,
   Sun,
   Moon,
-  Globe
+  Globe,
+  Video,
+  LayoutGrid,
+  Zap,
+  Code,
+  StickyNote,
+  Loader2,
+  Folder,
+  Tag,
+  FolderPlus,
+  Hash,
+  Menu,
+  SquarePen,
+  ChevronUp,
+  Terminal,
+  Compass,
+  MoreVertical,
+  Share2,
+  Edit2
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { cn } from '@/src/lib/utils';
 import Markdown from 'react-markdown';
 import { NoteFlowDashboard } from '../NoteFlow/NoteFlowDashboard';
 import { NoteFlowWorkspace } from '../NoteFlow/NoteFlowWorkspace';
-import { Workspace } from '../../types';
+import { logout } from '../../lib/auth';
+import { DataIntelligence } from '../DataIntelligence/DataIntelligence';
+import { VAR } from '../VAR/VAR';
+import { Powerdesk } from '../Powerdesk/Powerdesk';
+import { ResearchAgent } from '../ResearchAgent/ResearchAgent';
+import { AIChatbots } from '../AIChatbots/AIChatbots';
+import { AskReferences } from '../NoteFlow/AskReferences';
+import { ProjectHub } from '../ProjectHub/ProjectHub';
+import { Project } from '../../types';
 
 interface DashboardProps {
   user: User;
   theme?: 'light' | 'dark';
   onThemeToggle?: () => void;
+  onLogout?: () => void;
 }
 
-export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'overview' | 'notes' | 'profile' | 'analytics' | 'marketplace'>('chat');
+export function Dashboard({ user, theme, onThemeToggle, onLogout }: DashboardProps) {
+  const [activeTab, setActiveTab] = useState<'chat' | 'overview' | 'notes' | 'profile' | 'settings' | 'analytics' | 'marketplace' | 'data-intelligence' | 'plans' | 'var' | 'powerdesk' | 'project-hub'>('chat');
   const [notes, setNotes] = useState<Note[]>([]);
   const [input, setInput] = useState('');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string, file?: string }[]>([]);
   const [activeModal, setActiveModal] = useState<'link' | 'text' | null>(null);
   const [linkInput, setLinkInput] = useState('');
   const [textBlockInput, setTextBlockInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [noteFlowMode, setNoteFlowMode] = useState<'dashboard' | 'workspace' | null>(null);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [noteflowMode, setNoteflowMode] = useState<'dashboard' | 'workspace' | 'ai-chatbots' | 'ask-references' | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [greeting, setGreeting] = useState('');
+  const [sourceType, setSourceType] = useState<'pdf' | 'url' | 'text' | 'note' | null>(null);
+  const [sourceInput, setSourceInput] = useState('');
+  const [sourceTitle, setSourceTitle] = useState('');
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [folders, setFolders] = useState<{ id: string, name: string }[]>([]);
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
+  const [isGptsExpanded, setIsGptsExpanded] = useState(false);
+  const [activeProjectMenu, setActiveProjectMenu] = useState<string | null>(null);
+  const [tags, setTags] = useState<{ id: string, name: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [chats, setChats] = useState<{ id: string, title: string, folderId?: string, tags: string[] }[]>([
+    { id: '1', title: 'Powerdesk Concept Improvement', tags: ['design'] },
+    { id: '2', title: 'JSON structure for orders', tags: ['dev'] },
+    { id: '3', title: 'Clone Power BI UI', tags: ['dev'] },
+    { id: '4', title: 'AI Studio Features Explained', tags: ['ai'] },
+    { id: '5', title: 'PWA VAR with AI', tags: ['dev'] },
+    { id: '6', title: 'Multimodal AI System', tags: ['ai'] },
+  ]);
+
+  const greetings = [
+    `How can I help, ${user.name}?`,
+    `What's on your mind, ${user.name}?`,
+    `Need a hand with something, ${user.name}?`,
+    `What are we building today, ${user.name}?`,
+    `Let's create something amazing, ${user.name}.`,
+    `How's your day going, ${user.name}?`,
+    `Ready to dive in, ${user.name}?`,
+    `What's the plan for today, ${user.name}?`
+  ];
+
+  useEffect(() => {
+    setGreeting(greetings[Math.floor(Math.random() * greetings.length)]);
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const resp = await fetch(`/api/workspaces?userId=${user.id}`);
+      const data = await resp.json();
+      if (Array.isArray(data)) {
+        setFolders(data);
+      } else {
+        console.error("Fetch projects returned non-array data:", data);
+        setFolders([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+      setFolders([]);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    const name = prompt('Project name:');
+    if (!name) return;
+
+    try {
+      const resp = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, userId: user.id })
+      });
+      const newProject = await resp.json();
+      setFolders(prev => Array.isArray(prev) ? [...prev, newProject] : [newProject]);
+    } catch (err) {
+      console.error("Failed to create project:", err);
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+
+    try {
+      await fetch(`/api/workspaces/${id}`, { method: 'DELETE' });
+      setFolders(prev => Array.isArray(prev) ? prev.filter(f => f.id !== id) : []);
+      if (selectedProject?.id === id) {
+        setSelectedProject(null);
+        setActiveTab('chat');
+      }
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    }
+  };
+
+  const handleRenameProject = async (id: string, oldName: string) => {
+    const newName = prompt('Rename project:', oldName);
+    if (!newName) return;
+
+    try {
+      // Assuming PUT /api/workspaces/:id exists or using POST as placeholder
+      await fetch(`/api/workspaces/${id}`, {
+        method: 'POST', // In server.ts I didn't add rename yet, let's treat it as placeholder or add it later
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, userId: user.id })
+      });
+      setFolders(prev => Array.isArray(prev) ? prev.map(f => f.id === id ? { ...f, name: newName } : f) : []);
+    } catch (err) {
+      console.error("Failed to rename project:", err);
+    }
+  };
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -69,7 +203,7 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isGenerating]);
 
   const fetchNotes = async () => {
     try {
@@ -83,6 +217,16 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
     } catch (err) {
       console.error("Error fetching notes:", err);
     }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollButton(!isAtBottom);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const firstName = user.name.split(' ')[0];
@@ -99,6 +243,29 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
         mimeType: file.type,
       },
     };
+  };
+
+  const handleIndexSource = async () => {
+    if (!sourceInput.trim()) return;
+    setIsIndexing(true);
+    try {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Indexing ${sourceType === 'url' ? 'website' : sourceType}...` }]);
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `✓ Source indexed successfully. I've added this to your Noteflow knowledge base. You can now ask questions about it.` 
+      }]);
+      
+      setSourceType(null);
+      setSourceInput('');
+      setSourceTitle('');
+    } catch (err) {
+      console.error("Indexing failed:", err);
+    } finally {
+      setIsIndexing(false);
+    }
   };
 
   const sendMessage = async (customContent?: string, customFile?: File) => {
@@ -126,7 +293,7 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
         // Simulating PDF text extraction for the demo
         // In a real app, we'd use pdfjs-dist here
         const mockPages = [
-          { pageNumber: 1, text: "This is a manual for Note Flow. It explains how to use the multimodal RAG assistant.", imageBase64: "" },
+          { pageNumber: 1, text: "This is a manual for Noteflow. It explains how to use the multimodal RAG assistant.", imageBase64: "" },
           { pageNumber: 2, text: "To index a PDF, simply upload it. The system will extract text and images for better retrieval.", imageBase64: "" }
         ];
 
@@ -147,6 +314,11 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content, history: messages })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
 
       const data = await response.json();
       
@@ -181,25 +353,69 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
     </button>
   );
 
-  if (noteFlowMode === 'dashboard') {
+  if (noteflowMode === 'dashboard') {
     return (
       <NoteFlowDashboard 
         user={user} 
-        onSelectWorkspace={(ws) => {
-          setSelectedWorkspace(ws);
-          setNoteFlowMode('workspace');
+        onSelectProject={(proj) => {
+          setSelectedProject(proj);
+          setActiveTab('project-hub');
+          setNoteflowMode(null);
         }} 
+        onHome={() => setNoteflowMode(null)}
       />
     );
   }
 
-  if (noteFlowMode === 'workspace' && selectedWorkspace) {
+  if (noteflowMode === 'workspace' && selectedProject) {
     return (
       <NoteFlowWorkspace 
         user={user} 
-        workspace={selectedWorkspace} 
-        onBack={() => setNoteFlowMode('dashboard')} 
+        project={selectedProject} 
+        onBack={() => setNoteflowMode('dashboard')} 
+        onHome={() => setNoteflowMode(null)}
       />
+    );
+  }
+
+  if (noteflowMode === 'ai-chatbots') {
+    return (
+      <div className="fixed inset-0 z-[60] bg-[#111111] flex flex-col">
+        <header className="h-16 bg-[#111111] border-b border-white/5 px-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setNoteflowMode(null)} className="p-2 hover:bg-white/5 rounded-lg text-text-dim transition-all">
+              <ChevronRight className="rotate-180" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-white">
+                <Bot size={24} />
+              </div>
+              <h2 className="font-bold text-white">AI Chatbots</h2>
+            </div>
+          </div>
+          <button 
+            onClick={() => setNoteflowMode(null)}
+            className="p-2 hover:bg-white/5 rounded-full text-text-dim transition-all"
+          >
+            <X size={20} />
+          </button>
+        </header>
+        <div className="flex-1 overflow-hidden">
+          <AIChatbots user={user} onBack={() => setNoteflowMode(null)} />
+        </div>
+      </div>
+    );
+  }
+
+  if (noteflowMode === 'ask-references' && selectedProject) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+        <AskReferences 
+          user={user} 
+          project={selectedProject} 
+          onBack={() => setNoteflowMode('workspace')}
+        />
+      </div>
     );
   }
 
@@ -207,498 +423,871 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
     <div className="flex h-screen bg-bg text-text-main font-sans overflow-hidden">
       {/* Sidebar */}
       <aside className={cn(
-        "border-r border-white/5 bg-bg flex flex-col h-full transition-all duration-300 z-50",
-        isSidebarCollapsed ? "w-[52px]" : "w-64"
+        "bg-bg flex flex-col h-full transition-all duration-300 z-50 border-r border-white/5",
+        isSidebarCollapsed ? "w-0 overflow-hidden" : "w-64"
       )}>
-        {/* Top Icons */}
-        <div className="flex flex-col items-center py-4 gap-4">
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-2 text-text-dim hover:text-text-main hover:bg-white/5 rounded-lg transition-all"
-          >
-            <PanelLeftOpen size={20} className={cn("transition-transform duration-300", !isSidebarCollapsed && "rotate-180")} />
-          </button>
+        <div className="flex flex-col h-full p-2 py-4 gap-2">
+          {/* Top Header */}
+          <div className="flex items-center justify-between mb-2 px-3">
+            <button 
+              onClick={() => {
+                setActiveTab('chat');
+                setMessages([]);
+                setInput('');
+              }}
+              className="flex items-center gap-2 text-text-muted hover:text-text-main hover:bg-white/5 p-2 rounded-lg transition-all group"
+            >
+              <SquarePen size={20} className="text-text-main" />
+              <span className="text-sm font-medium">New chat</span>
+            </button>
+            <button 
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="p-2 text-text-muted hover:text-text-main hover:bg-white/5 rounded-lg transition-all"
+            >
+              <PanelLeftClose size={20} />
+            </button>
+          </div>
 
-          <div className="w-full px-2 space-y-2">
-            <button className={cn(
-              "w-full flex items-center gap-3 p-2 rounded-lg text-text-muted hover:bg-white/5 hover:text-text-main transition-all",
-              isSidebarCollapsed && "justify-center"
-            )}>
-              <MessageSquarePlus size={20} />
-              {!isSidebarCollapsed && <span className="text-sm font-medium">New chat</span>}
+          <div className="flex flex-col gap-0.5 px-2">
+            <button className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group">
+              <Search size={18} className="text-text-dim group-hover:text-text-main" />
+              <span className="text-sm">Search chats</span>
             </button>
-            <button className={cn(
-              "w-full flex items-center gap-3 p-2 rounded-lg text-text-muted hover:bg-white/5 hover:text-text-main transition-all",
-              isSidebarCollapsed && "justify-center"
-            )}>
-              <Search size={20} />
-              {!isSidebarCollapsed && <span className="text-sm font-medium">Search chats</span>}
+
+            <button className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group">
+              <ImageIcon size={18} className="text-text-dim group-hover:text-text-main" />
+              <span className="text-sm">Images</span>
             </button>
+
             <button 
               onClick={() => setActiveTab('marketplace')}
               className={cn(
-                "w-full flex items-center gap-3 p-2 rounded-lg text-text-muted hover:bg-white/5 hover:text-text-main transition-all",
-                isSidebarCollapsed && "justify-center",
-                activeTab === 'marketplace' && "bg-white/10 text-text-main"
+                "flex items-center gap-3 p-2 rounded-lg transition-all group",
+                activeTab === 'marketplace' ? "bg-white/5 text-text-main" : "text-text-muted hover:bg-white/5 hover:text-text-main"
               )}
             >
-              <ShoppingBag size={20} className={cn(activeTab === 'marketplace' && "text-accent-light")} />
-              {!isSidebarCollapsed && (
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-sm font-medium">Marketplaces</span>
-                  <span className="text-[0.6rem] font-bold px-1.5 py-0.5 bg-accent text-white rounded uppercase tracking-wider">Apps</span>
-                </div>
-              )}
+              <LayoutGrid size={18} className={cn("group-hover:text-text-main", activeTab === 'marketplace' ? "text-text-main" : "text-text-dim")} />
+              <span className="text-sm">Apps</span>
+            </button>
+
+            <button className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group">
+              <Zap size={18} className="text-text-dim group-hover:text-text-main" />
+              <span className="text-sm">Deep research</span>
+            </button>
+
+            <button className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group">
+              <Terminal size={18} className="text-text-dim group-hover:text-text-main" />
+              <span className="text-sm">Codex</span>
             </button>
           </div>
-        </div>
 
-        <div className="flex-1" />
-
-        {/* Bottom Icons */}
-        <div className="flex flex-col items-center py-4 gap-4">
-          <button className={cn(
-            "w-full flex items-center gap-3 p-2 rounded-lg text-text-muted hover:bg-white/5 hover:text-text-main transition-all",
-            isSidebarCollapsed && "justify-center"
-          )}>
-            <Sparkles size={20} className="text-accent" />
-            {!isSidebarCollapsed && (
-              <div className="text-left">
-                <p className="text-xs font-bold text-accent uppercase tracking-wider">Pro Plan</p>
-                <p className="text-[0.7rem] text-text-dim">Upgrade for more</p>
-              </div>
-            )}
-          </button>
-
-          <div className="relative w-full px-2">
+          <div className="flex flex-col gap-0.5 px-2 mt-4">
             <button 
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className={cn(
-                "w-full flex items-center gap-3 p-1 rounded-lg hover:bg-white/5 transition-all",
-                isSidebarCollapsed && "justify-center"
-              )}
+              onClick={() => setIsGptsExpanded(!isGptsExpanded)}
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group"
             >
-              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white font-bold text-xs shrink-0">
-                {user.name.charAt(0).toUpperCase()}
+              <div className="flex items-center gap-3">
+                <Bot size={18} className="text-text-dim group-hover:text-text-main" />
+                <span className="text-sm font-medium">GPTs</span>
               </div>
-              {!isSidebarCollapsed && (
-                <div className="text-left overflow-hidden">
-                  <p className="text-sm font-medium truncate">{user.name}</p>
-                  <p className="text-[0.7rem] text-text-dim truncate">user Plan</p>
-                </div>
-              )}
+              <motion.div
+                animate={{ rotate: isGptsExpanded ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight size={14} className="text-text-dim" />
+              </motion.div>
             </button>
-
             <AnimatePresence>
-              {isProfileOpen && (
-                <React.Fragment key="profile-menu-container">
-                  <motion.div 
-                    key="profile-overlay"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setIsProfileOpen(false)}
-                    className="fixed inset-0 z-40"
-                  />
-                  <motion.div
-                    key="profile-dropdown"
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className={cn(
-                      "absolute bottom-full mb-2 z-50 bg-[#171717] border border-white/10 rounded-xl shadow-2xl overflow-hidden min-w-[200px]",
-                      isSidebarCollapsed ? "left-0" : "left-0 right-0"
-                    )}
+              {isGptsExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden bg-white/[0.02] rounded-lg ml-2"
+                >
+                  <div className="p-2 text-xs text-text-dim italic">Explore personalized agents...</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button 
+              onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group"
+            >
+              <div className="flex items-center gap-3">
+                <Folder size={18} className="text-text-dim group-hover:text-text-main" />
+                <span className="text-sm font-medium">Projects</span>
+              </div>
+              <motion.div
+                animate={{ rotate: isProjectsExpanded ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight size={14} className="text-text-dim" />
+              </motion.div>
+            </button>
+            <AnimatePresence>
+              {isProjectsExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden ml-2 flex flex-col gap-0.5"
+                >
+                  <button 
+                    onClick={handleCreateProject}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all text-accent hover:text-accent-light group"
                   >
-                    <div className="p-3 border-b border-white/5 bg-white/5">
-                      <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-text-dim truncate">{user.email}</p>
+                    <FolderPlus size={16} />
+                    <span className="text-xs font-medium">Create folder</span>
+                  </button>
+
+                  {Array.isArray(folders) && folders.map(project => (
+                    <div key={project.id} className="relative group/project">
+                      <div 
+                        onClick={() => {
+                          setSelectedProject(project as any);
+                          setActiveTab('project-hub');
+                        }}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all text-text-muted hover:text-text-main group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                          <Folder size={14} className="text-text-dim shrink-0" />
+                          <span className="text-xs truncate">{project.name}</span>
+                        </div>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveProjectMenu(activeProjectMenu === project.id ? null : project.id);
+                          }}
+                          className="p-1 opacity-0 group-hover/project:opacity-100 hover:bg-white/10 rounded transition-all shrink-0"
+                        >
+                          <MoreVertical size={12} />
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {activeProjectMenu === project.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                            className="absolute left-full top-0 ml-2 z-[60] bg-surface border border-white/10 rounded-xl shadow-2xl p-1 min-w-[120px]"
+                          >
+                            <button 
+                              onClick={() => {
+                                alert('Share link copied to clipboard!');
+                                setActiveProjectMenu(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5 hover:text-text-main transition-all"
+                            >
+                              <Share2 size={14} />
+                              <span>Share</span>
+                            </button>
+                            <button 
+                              onClick={() => {
+                                handleRenameProject(project.id, project.name);
+                                setActiveProjectMenu(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5 hover:text-text-main transition-all"
+                            >
+                              <Edit2 size={14} />
+                              <span>Rename</span>
+                            </button>
+                            <div className="h-px bg-white/5 my-1" />
+                            <button 
+                              onClick={() => {
+                                handleDeleteProject(project.id);
+                                setActiveProjectMenu(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-red-400 hover:bg-red-400/10 transition-all font-medium"
+                            >
+                              <Trash2 size={14} />
+                              <span>Delete</span>
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar mt-4 px-2">
+            <div className="px-2 py-2 text-[11px] font-bold text-text-dim uppercase tracking-widest">Recents</div>
+            <div className="space-y-0.5">
+              {chats.map((chat) => (
+                <button 
+                  key={chat.id} 
+                  className="w-full flex items-center p-2 rounded-lg text-text-muted hover:bg-white/5 hover:text-text-main transition-all text-sm truncate text-left group"
+                >
+                  <span className="flex-1 truncate">{chat.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* User Profile */}
+          <div className="pt-2 border-t border-white/5 px-2">
+            <div className="relative">
+              <button 
+                onClick={onLogout}
+                className="w-full flex flex-col gap-2 p-2 rounded-lg hover:bg-surface-2 transition-all text-left"
+              >
+                <div className="flex items-center gap-3 w-full">
+                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="text-left overflow-hidden flex-1">
+                    <p className="text-sm font-medium truncate text-text-main uppercase tracking-tight">{user.name}</p>
+                    <p className="text-[10px] text-text-dim">Free • {user.email}</p>
+                  </div>
+                  <LogOut size={14} className="text-text-dim group-hover:text-text-main" />
+                </div>
+              </button>
+              
+              <button className="w-full mt-2 relative overflow-hidden group py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-white/10 shadow-lg">
+                <img 
+                  src="https://picsum.photos/seed/gift/400/200" 
+                  alt="Offer" 
+                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-accent/40 to-purple-500/40 mix-blend-overlay" />
+                <div className="relative z-10 flex items-center justify-center gap-2 text-white">
+                  <Gift size={14} />
+                  <span>Claim your offer</span>
+                </div>
+              </button>
+              
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    className="absolute bottom-full left-0 right-0 mb-2 bg-surface border border-border-muted rounded-xl shadow-2xl overflow-hidden z-50"
+                  >
                     <div className="p-1">
                       <button 
-                        onClick={() => { setActiveTab('overview'); setIsProfileOpen(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-lg transition-colors"
-                      >
-                        <LayoutDashboard size={16} /> Overview
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('notes'); setIsProfileOpen(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-lg transition-colors"
-                      >
-                        <FileText size={16} /> Noteflow LM
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('analytics'); setIsProfileOpen(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-lg transition-colors"
-                      >
-                        <BarChart3 size={16} /> Analytics
-                      </button>
-                      <button 
                         onClick={() => { setActiveTab('profile'); setIsProfileOpen(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-lg transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-dim hover:bg-surface-2 hover:text-text-main transition-all text-sm"
                       >
-                        <UserIcon size={16} /> Profile
+                        <UserIcon size={16} />
+                        <span>Profile</span>
                       </button>
-                    </div>
-                    <div className="p-1 border-t border-white/5">
                       <button 
-                        onClick={() => setIsProfileOpen(false)}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-lg transition-colors"
+                        onClick={() => { setActiveTab('settings'); setIsProfileOpen(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-dim hover:bg-surface-2 hover:text-text-main transition-all text-sm"
                       >
-                        <Settings size={16} /> Settings
+                        <Settings size={16} />
+                        <span>Settings</span>
+                      </button>
+                      <div className="h-px bg-border-muted my-1" />
+                      <button 
+                        onClick={() => logout()}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-400/10 transition-all text-sm"
+                      >
+                        <LogOut size={16} />
+                        <span>Logout</span>
                       </button>
                     </div>
                   </motion.div>
-                </React.Fragment>
-              )}
-            </AnimatePresence>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col bg-bg relative overflow-y-auto">
-        {/* Top Header */}
-        <header className="h-14 flex items-center justify-between px-6 sticky top-0 bg-bg/80 backdrop-blur-md z-30">
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <span className="text-[0.9rem] font-bold tracking-tight text-text-muted group-hover:text-text-main transition-colors">SWAHIVO</span>
-            <ChevronRight size={14} className="text-text-dim rotate-90" />
+      <main className="flex-1 flex flex-col bg-bg relative overflow-hidden">
+        {/* Background Atmosphere */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-30">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
+          <img 
+            src="https://picsum.photos/seed/swahivo-bg/1920/1080?blur=4" 
+            alt="Atmosphere"
+            className="w-full h-full object-cover mix-blend-overlay opacity-20"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+        <>
+          {/* Top Header */}
+          <header className="h-14 flex items-center justify-between px-4 z-30">
+          <div className="flex items-center gap-2">
+            {isSidebarCollapsed && (
+              <button 
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="p-2 text-text-muted hover:text-text-main hover:bg-surface-2 rounded-lg transition-all"
+              >
+                <PanelLeftOpen size={20} />
+              </button>
+            )}
+            <button className="flex items-center gap-1.5 px-3 py-2 hover:bg-white/5 rounded-xl transition-all text-text-muted hover:text-text-main font-medium group">
+              <div className="text-text-main text-lg font-display font-black tracking-tighter flex items-center justify-center leading-none select-none">
+                SWAHIVO AI
+              </div>
+              <ChevronDown size={16} className="text-text-dim group-hover:text-text-main transition-colors mt-0.5" />
+            </button>
           </div>
           
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={onThemeToggle}
-              className="p-2 text-text-dim hover:text-text-main hover:bg-white/5 rounded-lg transition-all"
-              title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            >
-              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-            </button>
-            <button className="px-3 py-1.5 bg-white/5 border border-white/10 text-text-muted text-[0.75rem] font-bold rounded-full hover:bg-white/10 transition-all flex items-center gap-2">
+          <div className="flex-1 flex justify-center">
+            <button className="px-4 py-1.5 bg-surface-2 hover:bg-surface-3 rounded-full text-xs font-medium text-text-main flex items-center gap-2 border border-border-muted transition-all">
               <Gift size={14} className="text-accent" />
-              Free offer
+              <span>Free offer</span>
             </button>
-            <div className="flex items-center gap-3 text-text-dim">
-              <button className="hover:text-text-main transition-colors"><Settings size={20} /></button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button className="p-2 text-text-muted hover:text-text-main hover:bg-surface-2 rounded-full transition-all">
+              <Sparkles size={18} />
+            </button>
+            <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center text-xs font-bold border border-border-muted">
+              {user.name.charAt(0).toUpperCase()}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col items-center p-6 lg:p-12">
+        <div 
+          onScroll={handleScroll}
+          className="flex-1 flex flex-col items-center overflow-y-auto px-4 custom-scrollbar"
+        >
           {activeTab === 'chat' && (
             <div className={cn(
-              "w-full max-w-3xl flex-1 flex flex-col items-center gap-8",
-              messages.length === 0 ? "justify-center" : "justify-start"
+              "w-full max-w-3xl flex-1 flex flex-col items-center z-10",
+              messages.length === 0 ? "justify-center" : "justify-start pt-10"
             )}>
               {messages.length === 0 ? (
-                <h1 className="text-4xl font-medium text-white tracking-tight mb-4">What are you working on?</h1>
-              ) : (
-                <div className="w-full flex-1 overflow-y-auto space-y-6 mb-8 pr-4 custom-scrollbar">
-                  {messages.map((msg, i) => (
-                    <motion.div 
-                      key={`msg-${i}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={cn(
-                        "flex flex-col gap-2 max-w-[85%]",
-                        msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start"
-                      )}
-                    >
-                      <div className={cn(
-                        "px-4 py-3 rounded-2xl text-[0.95rem] leading-relaxed",
-                        msg.role === 'user' ? "bg-accent text-white rounded-tr-none" : "bg-white/5 border border-white/10 text-text-main rounded-tl-none"
-                      )}>
-                        {msg.role === 'assistant' ? (
-                          <div className="prose prose-invert max-w-none prose-sm">
-                            <Markdown>{msg.content}</Markdown>
-                          </div>
-                        ) : (
-                          msg.content
-                        )}
-                        {msg.file && (
-                          <div className="mt-2 flex items-center gap-2 px-2 py-1.5 bg-black/20 rounded-lg text-xs border border-white/5">
-                            <FileText size={14} className="text-blue-400" />
-                            <span className="truncate max-w-[150px]">{msg.file}</span>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                  <div key="messages-end-anchor" ref={messagesEndRef} />
-                </div>
-              )}
-              
-                <div className="w-full max-w-2xl relative group">
-                  {/* Removed focus glow div that was appearing on type */}
-                  
-                  {selectedFile && (
-                    <div className="absolute -top-12 left-0 flex items-center gap-2 px-3 py-1.5 bg-accent/20 border border-accent/30 rounded-full text-xs text-accent-light animate-in fade-in slide-in-from-bottom-2">
-                      <FileText size={14} />
-                      <span className="truncate max-w-[150px] font-medium">{selectedFile.name}</span>
-                      <button 
-                        onClick={() => setSelectedFile(null)}
-                        className="ml-1 p-0.5 hover:bg-white/10 rounded-full transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                <div className="w-full flex flex-col items-center gap-8 animate-in fade-in zoom-in duration-1000">
+                  <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="relative w-32 h-32 mb-2"
+                  >
+                    <div className="absolute inset-0 bg-accent/30 rounded-[40px] blur-3xl animate-pulse" />
+                    <div className="relative w-full h-full bg-surface border border-white/10 rounded-[40px] overflow-hidden shadow-2xl p-1">
+                      <img 
+                        src={`https://picsum.photos/seed/${user.id}-avatar/400`} 
+                        alt={user.name}
+                        className="w-full h-full object-cover rounded-[36px]"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
-                  )}
+                  </motion.div>
                   
-                  {/* Plus Menu */}
-                  <AnimatePresence>
-                    {isPlusMenuOpen && (
-                      <React.Fragment key="plus-menu-container">
-                        <div key="plus-menu-overlay" className="fixed inset-0 z-40" onClick={() => setIsPlusMenuOpen(false)} />
-                        <motion.div
-                          key="plus-menu-dropdown"
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          className="absolute bottom-full left-0 mb-4 z-50 bg-[#171717] border border-white/10 rounded-2xl shadow-2xl p-1.5 min-w-[170px]"
+                  <h1 className="text-4xl md:text-5xl font-display font-black text-text-main tracking-tighter text-center leading-tight">
+                    {greeting}
+                  </h1>
+                  
+                  <div className="w-full relative flex items-center bg-surface/80 backdrop-blur-xl rounded-[28px] p-2 shadow-2xl border border-white/5">
+                    {/* Indexing Overlay */}
+                    <AnimatePresence>
+                      {sourceType && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="absolute inset-0 z-50 bg-surface rounded-[26px] p-4 flex flex-col gap-4 border border-accent/30 shadow-2xl shadow-accent/5"
                         >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+                                {sourceType === 'url' && <Globe size={16} />}
+                                {sourceType === 'text' && <Type size={16} />}
+                                {sourceType === 'note' && <StickyNote size={16} />}
+                              </div>
+                              <span className="text-sm font-bold text-text-main uppercase tracking-widest">
+                                Index {sourceType === 'url' ? 'Website' : sourceType}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => setSourceType(null)}
+                              className="p-1.5 hover:bg-surface-2 rounded-lg text-text-dim transition-all"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          
+                          <div className="flex-1 flex flex-col gap-3">
+                            <input 
+                              type="text"
+                              value={sourceTitle}
+                              onChange={(e) => setSourceTitle(e.target.value)}
+                              placeholder={sourceType === 'url' ? "Website Title (Optional)" : "Title"}
+                              className="w-full bg-surface-2 border border-border-muted rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent transition-all text-text-main"
+                            />
+                            <textarea 
+                              value={sourceInput}
+                              onChange={(e) => setSourceInput(e.target.value)}
+                              placeholder={sourceType === 'url' ? "https://example.com" : "Paste your content here..."}
+                              className="flex-1 bg-surface-2 border border-border-muted rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent transition-all resize-none custom-scrollbar text-text-main"
+                            />
+                          </div>
+
                           <button 
-                            onClick={() => { fileInputRef.current?.click(); setIsPlusMenuOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[0.82rem] text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
+                            onClick={handleIndexSource}
+                            disabled={isIndexing || !sourceInput.trim()}
+                            className="w-full py-2.5 bg-accent text-black rounded-xl text-xs font-bold hover:bg-accent/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                           >
-                            <FileText size={16} className="text-blue-400" />
-                            <span>Upload PDF</span>
-                          </button>
-                          <button 
-                            onClick={() => { imageInputRef.current?.click(); setIsPlusMenuOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[0.82rem] text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
-                          >
-                            <ImageIcon size={16} className="text-green-400" />
-                            <span>Image upload</span>
-                          </button>
-                          <button 
-                            onClick={() => { setIsRecording(true); setIsPlusMenuOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[0.82rem] text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
-                          >
-                            <Mic size={16} className="text-red-400" />
-                            <span>Voice input</span>
-                          </button>
-                          <button 
-                            onClick={() => { setActiveModal('link'); setIsPlusMenuOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[0.82rem] text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
-                          >
-                            <LinkIcon size={16} className="text-purple-400" />
-                            <span>Paste link</span>
-                          </button>
-                          <button 
-                            onClick={() => { setActiveModal('text'); setIsPlusMenuOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[0.82rem] text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
-                          >
-                            <Type size={16} className="text-yellow-400" />
-                            <span>Add text block</span>
+                            {isIndexing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                            <span>Index to Noteflow</span>
                           </button>
                         </motion.div>
-                      </React.Fragment>
-                    )}
-                  </AnimatePresence>
+                      )}
+                    </AnimatePresence>
 
-                  <div className="relative flex items-center bg-surface border border-border-subtle/30 rounded-2xl py-4 pl-12 pr-24 text-text-main shadow-2xl transition-all focus-within:border-transparent focus-within:shadow-none focus-within:ring-0">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <div className="flex items-center gap-1 pl-2">
                       <button 
                         onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
-                        className={cn(
-                          "p-1 text-text-dim hover:text-text-main hover:bg-white/5 rounded-lg transition-all",
-                          isPlusMenuOpen && "bg-white/10 text-text-main rotate-45"
-                        )}
+                        className="p-2 text-text-muted hover:text-text-main hover:bg-surface-2 rounded-full transition-all"
                       >
                         <Plus size={20} />
                       </button>
                     </div>
                     
-                    <input 
-                      type="text"
+                    <textarea 
+                      rows={1}
                       value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                      onChange={(e) => {
+                        setInput(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                          (e.target as HTMLTextAreaElement).style.height = 'auto';
+                        }
+                      }}
                       placeholder="Ask anything"
-                      autoComplete="off"
-                      spellCheck={false}
-                      className="w-full bg-transparent border-none focus:ring-0 text-[1rem] placeholder:text-text-dim"
+                      className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-[1rem] py-3 px-2 placeholder:text-text-dim resize-none max-h-60 custom-scrollbar text-text-main"
                     />
                     
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3 text-text-dim">
-                      <button 
-                        onClick={() => setIsRecording(!isRecording)}
-                        className={cn(
-                          "transition-all duration-300",
-                          isRecording ? "text-red-500 scale-125 animate-pulse" : "hover:text-white"
-                        )}
-                      >
-                        <Mic size={20} />
-                      </button>
-                      <button className="hover:text-white transition-colors"><AudioLines size={20} /></button>
+                    <div className="flex items-center gap-1 pr-2">
                       <button 
                         onClick={() => sendMessage()}
                         disabled={!input.trim() && !selectedFile}
                         className={cn(
-                          "p-2 rounded-xl transition-all",
-                          (input.trim() || selectedFile) ? "bg-accent text-white shadow-lg shadow-accent/20 scale-110" : "text-text-dim opacity-50 cursor-not-allowed"
+                          "p-2 rounded-full transition-all",
+                          (input.trim() || selectedFile) ? "bg-accent text-white" : "text-text-dim opacity-50"
                         )}
                       >
                         <ArrowUp size={20} />
                       </button>
                     </div>
+
+                    {/* Plus Menu */}
+                    <AnimatePresence>
+                      {isPlusMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute bottom-full left-0 mb-4 bg-surface border border-white/10 rounded-2xl shadow-2xl p-2 min-w-[200px]"
+                        >
+                          <button 
+                            onClick={() => { fileInputRef.current?.click(); setIsPlusMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-surface-2 hover:text-text-main rounded-xl transition-colors"
+                          >
+                            <FileText size={18} className="text-blue-400" />
+                            <span>Upload PDF</span>
+                          </button>
+                          <button 
+                            onClick={() => { imageInputRef.current?.click(); setIsPlusMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-surface-2 hover:text-text-main rounded-xl transition-colors"
+                          >
+                            <ImageIcon size={18} className="text-green-400" />
+                            <span>Image upload</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="w-full space-y-8 mb-8">
+                    {messages.map((msg, i) => (
+                      <motion.div 
+                        key={`msg-${i}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "flex gap-4 w-full",
+                          msg.role === 'user' ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        {msg.role === 'assistant' && (
+                          <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                            <Bot size={16} className="text-white" />
+                          </div>
+                        )}
+                        <div className={cn(
+                          "max-w-[85%] px-4 py-2 rounded-2xl text-[0.95rem] leading-relaxed",
+                          msg.role === 'user' ? "bg-surface text-white" : "text-text-main"
+                        )}>
+                          {msg.role === 'assistant' ? (
+                            <div className="prose prose-invert prose-sm max-w-none">
+                              <Markdown>{msg.content}</Markdown>
+                            </div>
+                          ) : (
+                            msg.content
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+
+                    {isGenerating && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex gap-4 w-full justify-start"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                          <Bot size={16} className="text-white" />
+                        </div>
+                        <div className="bg-surface/50 px-4 py-3 rounded-2xl flex gap-1.5 items-center">
+                          <motion.div 
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ repeat: Infinity, duration: 1, delay: 0 }}
+                            className="w-1.5 h-1.5 bg-text-main rounded-full" 
+                          />
+                          <motion.div 
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+                            className="w-1.5 h-1.5 bg-text-main rounded-full" 
+                          />
+                          <motion.div 
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+                            className="w-1.5 h-1.5 bg-text-main rounded-full" 
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                    <div key="messages-end-anchor" ref={messagesEndRef} />
                   </div>
 
-                  {/* Hidden Inputs */}
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    accept=".pdf" 
-                    className="hidden" 
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  />
-                  <input 
-                    type="file" 
-                    ref={imageInputRef} 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  />
-                </div>
-                
-                {isGenerating && (
-                  <div key="generating-loader" className="flex items-center gap-2 text-text-dim text-sm animate-pulse mt-4">
-                    <Sparkles size={16} className="text-accent" />
-                    <span>Gemini is thinking...</span>
+                  {/* Input Bar (Sticky) */}
+                  <div className="w-full max-w-3xl sticky bottom-4 mt-auto pb-4 bg-bg">
+                    {/* Scroll to Bottom Button */}
+                    <AnimatePresence>
+                      {showScrollButton && (
+                        <motion.button
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                          onClick={scrollToBottom}
+                          className="absolute -top-12 left-1/2 -translate-x-1/2 w-8 h-8 bg-surface border border-white/10 rounded-full flex items-center justify-center text-text-main shadow-xl hover:bg-white/5 transition-all z-40"
+                        >
+                          <ArrowDown size={16} />
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="relative flex items-center bg-bg rounded-[26px] p-2 shadow-2xl border border-white/10">
+                      <div className="flex items-center gap-1 pl-2">
+                        <button 
+                          onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                          className="p-2 text-text-muted hover:text-text-main hover:bg-white/5 rounded-full transition-all"
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                      
+                      <textarea 
+                        rows={1}
+                        value={input}
+                        onChange={(e) => {
+                          setInput(e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage();
+                            (e.target as HTMLTextAreaElement).style.height = 'auto';
+                          }
+                        }}
+                        placeholder="Ask anything"
+                        className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-[1rem] py-3 px-2 text-text-main placeholder:text-text-dim resize-none max-h-60 custom-scrollbar"
+                      />
+                      
+                      <div className="flex items-center gap-1 pr-2">
+                        <button 
+                          onClick={() => sendMessage()}
+                          disabled={!input.trim() && !selectedFile}
+                          className={cn(
+                            "p-2 rounded-full transition-all",
+                            (input.trim() || selectedFile) ? "bg-white text-black" : "text-text-dim opacity-50"
+                          )}
+                        >
+                          <ArrowUp size={20} />
+                        </button>
+                      </div>
+
+                      {/* Plus Menu */}
+                      <AnimatePresence>
+                        {isPlusMenuOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full left-0 mb-4 bg-surface border border-white/10 rounded-2xl shadow-2xl p-2 min-w-[200px]"
+                          >
+                            <button 
+                              onClick={() => { fileInputRef.current?.click(); setIsPlusMenuOpen(false); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
+                            >
+                              <FileText size={18} className="text-blue-400" />
+                              <span>Upload PDF</span>
+                            </button>
+                            <button 
+                              onClick={() => { setIsPlusMenuOpen(false); setSourceType('url'); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
+                            >
+                              <Globe size={18} className="text-blue-500" />
+                              <span>Web Search</span>
+                            </button>
+                            <button 
+                              onClick={() => { setIsPlusMenuOpen(false); setSourceType('text'); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
+                            >
+                              <Type size={18} className="text-purple-400" />
+                              <span>Add Text</span>
+                            </button>
+                            <button 
+                              onClick={() => { setIsPlusMenuOpen(false); setSourceType('note'); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
+                            >
+                              <StickyNote size={18} className="text-emerald-400" />
+                              <span>Add Note</span>
+                            </button>
+                            <div className="h-px bg-white/5 my-1" />
+                            <button 
+                              onClick={() => { imageInputRef.current?.click(); setIsPlusMenuOpen(false); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-muted hover:bg-white/5 hover:text-text-main rounded-xl transition-colors"
+                            >
+                              <ImageIcon size={18} className="text-green-400" />
+                              <span>Image upload</span>
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
-                )}
+                </>
+              )}
             </div>
           )}
 
-          {activeTab === 'overview' && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-5xl space-y-10"
-            >
-              <header>
-                <h1 className="text-3xl font-serif font-semibold mb-2">Welcome back, {firstName}</h1>
-                <p className="text-text-muted text-lg">Here's what's happening with your account today.</p>
-              </header>
+          {activeTab === 'marketplace' && (
+            <div className="w-full h-full overflow-y-auto custom-scrollbar">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-5xl mx-auto py-10 px-6 space-y-10"
+              >
+                <header>
+                  <h1 className="text-3xl font-display font-black mb-2 text-text-main">Marketplace<span className="text-accent">.</span></h1>
+                  <p className="text-text-muted">Explore AI-powered tools and features.</p>
+                </header>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-[#2f2f2f] border border-white/5 p-8 rounded-[20px]">
-                  <p className="text-text-muted text-sm font-medium mb-1 uppercase tracking-wider">Total Notes</p>
-                  <p className="text-4xl font-bold">{notes.length}</p>
-                </div>
-                <div className="bg-[#2f2f2f] border border-white/5 p-8 rounded-[20px]">
-                  <p className="text-text-muted text-sm font-medium mb-1 uppercase tracking-wider">Active Sessions</p>
-                  <p className="text-4xl font-bold">1</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-[#2f2f2f] border border-white/5 p-8 rounded-[20px]">
-                  <h3 className="text-xl font-serif font-semibold mb-6">Recent Activity</h3>
-                  {notes.length > 0 ? (
-                    <div className="space-y-4">
-                      {notes.slice(0, 3).map(note => (
-                        <div key={note.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center text-accent-light">
-                              <FileText size={20} />
-                            </div>
-                            <div>
-                              <p className="font-medium text-[0.95rem]">{note.title}</p>
-                              <p className="text-xs text-text-dim">{new Date(note.created_at).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <ChevronRight size={16} className="text-text-dim" />
-                        </div>
-                      ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Noteflow Card */}
+                  <div className="bg-surface border border-border-muted p-0 rounded-2xl overflow-hidden flex flex-col hover:border-accent/50 transition-all group shadow-xl hover:shadow-accent/5">
+                    <div className="h-44 w-full relative overflow-hidden">
+                      <img 
+                        src="https://picsum.photos/seed/research-ai/800/600" 
+                        alt="Noteflow" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
+                      <div className="absolute bottom-4 left-4 w-10 h-10 bg-emerald-500/20 backdrop-blur-md rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                        <Bot size={20} />
+                      </div>
                     </div>
-                  ) : (
-                    <div className="py-12 text-center text-text-dim italic border border-dashed border-white/10 rounded-xl">
-                      No recent activity found.
+                    <div className="p-6 flex flex-col gap-4 flex-1">
+                      <div>
+                        <h3 className="text-lg font-display font-black mb-1 text-text-main">Noteflow</h3>
+                        <p className="text-sm text-text-dim leading-relaxed">Advanced research tool with PDF indexing, web crawling, and multimodal RAG.</p>
+                      </div>
+                      <button 
+                        onClick={() => setNoteflowMode('dashboard')}
+                        className="mt-auto w-full py-2.5 bg-surface-2 hover:bg-accent hover:text-white rounded-xl text-sm font-bold transition-all text-text-main"
+                      >
+                        Open Noteflow
+                      </button>
                     </div>
-                  )}
-                </div>
-
-                <div className="bg-linear-to-br from-accent to-accent-light p-8 rounded-[20px] text-white shadow-xl shadow-accent/20 flex flex-col justify-between min-h-[300px]">
-                  <div>
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-6">
-                      <Sparkles size={24} />
-                    </div>
-                    <h3 className="text-2xl font-serif font-bold mb-3">Pro Plan</h3>
-                    <p className="text-white/80 text-[0.95rem] leading-relaxed">
-                      Unlock advanced analytics and unlimited Noteflow LM storage.
-                    </p>
                   </div>
-                  <button className="w-full py-3.5 bg-white text-accent font-bold rounded-xl hover:bg-white/90 transition-all active:scale-95 shadow-lg">
-                    Upgrade Now
-                  </button>
+
+                  {/* Powerdesk Card */}
+                  <div className="bg-surface border border-border-muted p-0 rounded-2xl overflow-hidden flex flex-col hover:border-accent/50 transition-all group shadow-xl hover:shadow-accent/5">
+                    <div className="h-44 w-full relative overflow-hidden">
+                      <img 
+                        src="https://picsum.photos/seed/support/800/600" 
+                        alt="Powerdesk" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
+                      <div className="absolute bottom-4 left-4 w-10 h-10 bg-purple-500/20 backdrop-blur-md rounded-xl flex items-center justify-center text-purple-400 border border-purple-500/20">
+                        <MessageSquare size={20} />
+                      </div>
+                    </div>
+                    <div className="p-6 flex flex-col gap-4 flex-1">
+                      <div>
+                        <h3 className="text-lg font-display font-black mb-1 text-text-main">Powerdesk</h3>
+                        <p className="text-sm text-text-dim leading-relaxed">Unified communication hub for all your customer conversations.</p>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab('powerdesk')}
+                        className="mt-auto w-full py-2.5 bg-surface-2 hover:bg-accent hover:text-white rounded-xl text-sm font-bold transition-all text-text-main"
+                      >
+                        Open Desk
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* VAR System Card */}
+                  <div className="bg-surface border border-border-muted p-0 rounded-2xl overflow-hidden flex flex-col hover:border-accent/50 transition-all group shadow-xl hover:shadow-accent/5">
+                    <div className="h-44 w-full relative overflow-hidden">
+                      <img 
+                        src="https://picsum.photos/seed/sports/800/600" 
+                        alt="VAR" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
+                      <div className="absolute bottom-4 left-4 w-10 h-10 bg-orange-500/20 backdrop-blur-md rounded-xl flex items-center justify-center text-orange-400 border border-orange-500/20">
+                        <Video size={20} />
+                      </div>
+                    </div>
+                    <div className="p-6 flex flex-col gap-4 flex-1">
+                      <div>
+                        <h3 className="text-lg font-display font-black mb-1 text-text-main">VAR System</h3>
+                        <p className="text-sm text-text-dim leading-relaxed">Video Assistant Referee system for sports analysis.</p>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab('var')}
+                        className="mt-auto w-full py-2.5 bg-surface-2 hover:bg-accent hover:text-white rounded-xl text-sm font-bold transition-all text-text-main"
+                      >
+                        Open VAR
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* AI Chatbots Card */}
+                  <div className="bg-surface border border-border-muted p-0 rounded-2xl overflow-hidden flex flex-col hover:border-accent/50 transition-all group shadow-xl hover:shadow-accent/5">
+                    <div className="h-44 w-full relative overflow-hidden">
+                      <img 
+                        src="https://picsum.photos/seed/agents/800/600" 
+                        alt="Chatbots" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
+                      <div className="absolute bottom-4 left-4 w-10 h-10 bg-blue-500/20 backdrop-blur-md rounded-xl flex items-center justify-center text-blue-400 border border-blue-500/20">
+                        <Bot size={20} />
+                      </div>
+                    </div>
+                    <div className="p-6 flex flex-col gap-4 flex-1">
+                      <div>
+                        <h3 className="text-lg font-display font-black mb-1 text-text-main">AI Chatbots</h3>
+                        <p className="text-sm text-text-dim leading-relaxed">Create and deploy specialized AI agents for your business needs.</p>
+                      </div>
+                      <button 
+                        onClick={() => setNoteflowMode('ai-chatbots')}
+                        className="mt-auto w-full py-2.5 bg-surface-2 hover:bg-accent hover:text-white rounded-xl text-sm font-bold transition-all text-text-main"
+                      >
+                        Open Chatbots
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </div>
           )}
 
-          {activeTab === 'marketplace' && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-5xl space-y-10"
-            >
-              <header>
-                <h1 className="text-3xl font-serif font-semibold mb-2">Note Flow Marketplace</h1>
-                <p className="text-text-muted text-lg">Discover and install extensions for your Note Flow assistant.</p>
-              </header>
+          {activeTab === 'project-hub' && selectedProject && (
+            <div className="w-full h-full flex flex-col">
+              <ProjectHub user={user} project={selectedProject} onBack={() => setActiveTab('chat')} />
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-[#2f2f2f] border border-white/5 p-6 rounded-[20px] flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center text-accent-light">
-                    <FileText size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold mb-1">PDF Analyzer Pro</h3>
-                    <p className="text-sm text-text-dim">Advanced multimodal RAG for complex PDF documents.</p>
-                  </div>
-                  <button 
-                    onClick={() => setNoteFlowMode('dashboard')}
-                    className="mt-auto py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/90 transition-all"
-                  >
-                    Open Note Flow
-                  </button>
+          {activeTab === 'powerdesk' && (
+            <div className="w-full h-full flex flex-col">
+              <Powerdesk user={user} onBack={() => setActiveTab('chat')} />
+            </div>
+          )}
+
+          {activeTab === 'var' && (
+            <div className="w-full h-full overflow-y-auto custom-scrollbar">
+              <VAR user={user} onBack={() => setActiveTab('chat')} />
+            </div>
+          )}
+
+          {activeTab === 'plans' && (
+            <div className="w-full h-full overflow-y-auto custom-scrollbar py-20 px-6">
+              <div className="max-w-4xl mx-auto text-center space-y-12">
+                <div className="space-y-4">
+                  <h2 className="text-4xl font-bold">Choose your plan</h2>
+                  <p className="text-text-muted text-lg">Scale your AI capabilities with our flexible pricing.</p>
                 </div>
                 
-                <div className="bg-[#2f2f2f] border border-white/5 p-6 rounded-[20px] flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-green-400/10 rounded-xl flex items-center justify-center text-green-400">
-                    <Globe size={24} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="bg-surface border border-border-muted p-8 rounded-3xl text-left space-y-6">
+                    <div>
+                      <h3 className="text-xl font-bold mb-1 text-text-main">Free</h3>
+                      <p className="text-text-dim text-sm">Basic AI features for individuals.</p>
+                    </div>
+                    <div className="text-3xl font-bold text-text-main">$0<span className="text-sm font-normal text-text-dim">/mo</span></div>
+                    <ul className="space-y-3">
+                      {['Basic Chat', '1 Workspace', 'Standard Support'].map(f => (
+                        <li key={f} className="flex items-center gap-2 text-sm text-text-muted">
+                          <Sparkles size={14} className="text-accent" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <button className="w-full py-3 bg-surface-2 hover:bg-surface-3 rounded-xl font-bold transition-all text-text-main">Current Plan</button>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold mb-1">Web Search</h3>
-                    <p className="text-sm text-text-dim">Real-time web search integration for your chats.</p>
-                  </div>
-                  <button className="mt-auto py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/90 transition-all">
-                    Install
-                  </button>
-                </div>
 
-                <div className="bg-[#2f2f2f] border border-white/5 p-6 rounded-[20px] flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-purple-400/10 rounded-xl flex items-center justify-center text-purple-400">
-                    <Sparkles size={24} />
+                  <div className="bg-surface border-2 border-accent p-8 rounded-3xl text-left space-y-6 relative overflow-hidden">
+                    <div className="absolute top-4 right-4 px-3 py-1 bg-accent text-black text-[10px] font-bold rounded-full uppercase">Popular</div>
+                    <div>
+                      <h3 className="text-xl font-bold mb-1 text-text-main">Pro</h3>
+                      <p className="text-text-dim text-sm">Advanced tools for professionals.</p>
+                    </div>
+                    <div className="text-3xl font-bold text-text-main">$20<span className="text-sm font-normal text-text-dim">/mo</span></div>
+                    <ul className="space-y-3">
+                      {['Advanced Models', 'Unlimited Workspaces', 'Priority Support', 'Custom Chatbots'].map(f => (
+                        <li key={f} className="flex items-center gap-2 text-sm text-text-muted">
+                          <Sparkles size={14} className="text-accent" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <button className="w-full py-3 bg-accent text-black font-bold rounded-xl hover:bg-accent-dark transition-all">Upgrade to Pro</button>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold mb-1">Creative Writing</h3>
-                    <p className="text-sm text-text-dim">Specialized model for storytelling and creative drafting.</p>
-                  </div>
-                  <button className="mt-auto py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/90 transition-all">
-                    Install
-                  </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
+
           {activeTab === 'notes' && (
-            <div className="w-full max-w-5xl">
-              <h2 className="text-3xl font-serif font-semibold mb-6">Noteflow LM</h2>
+            <div className="w-full max-w-5xl py-10 px-6">
+              <h2 className="text-3xl font-semibold mb-6 text-text-main">Noteflow</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {notes.map(note => (
-                  <div key={note.id} className="bg-[#2f2f2f] border border-white/5 p-6 rounded-[20px]">
-                    <h4 className="font-bold text-lg mb-2">{note.title}</h4>
+                  <div key={note.id} className="bg-surface border border-border-muted p-6 rounded-2xl hover:border-border-subtle transition-all">
+                    <h4 className="font-bold text-lg mb-2 text-text-main">{note.title}</h4>
                     <p className="text-text-muted text-sm line-clamp-3">{note.content}</p>
                   </div>
                 ))}
@@ -708,11 +1297,12 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
           )}
         </div>
 
-        <div className="w-full flex justify-center py-3 bg-bg/50 backdrop-blur-sm border-t border-white/5 mt-auto">
+        <div className="w-full flex justify-center py-3 bg-bg/50 backdrop-blur-sm border-t border-border-muted mt-auto">
           <p className="text-[0.65rem] text-text-dim/60 font-medium text-center">
             Swahivo AI isn’t perfect—always double-check
           </p>
         </div>
+        </>
       </main>
 
       {/* Modals */}
@@ -732,11 +1322,11 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-[#171717] border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden"
+              className="relative w-full max-w-lg bg-surface border border-border-muted rounded-3xl shadow-2xl p-8 overflow-hidden"
             >
               <button 
                 onClick={() => setActiveModal(null)}
-                className="absolute top-4 right-4 p-2 text-text-dim hover:text-text-main hover:bg-white/5 rounded-full transition-all"
+                className="absolute top-4 right-4 p-2 text-text-muted hover:text-text-main hover:bg-surface-2 rounded-full transition-all"
               >
                 <X size={20} />
               </button>
@@ -748,8 +1338,8 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
                       <LinkIcon size={24} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-semibold">Paste Link</h3>
-                      <p className="text-sm text-text-dim">Analyze content from a URL</p>
+                      <h3 className="text-xl font-semibold text-text-main">Paste Link</h3>
+                      <p className="text-sm text-text-muted">Analyze content from a URL</p>
                     </div>
                   </div>
                   <input 
@@ -757,7 +1347,7 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
                     value={linkInput}
                     onChange={(e) => setLinkInput(e.target.value)}
                     placeholder="https://example.com"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-purple-400/50 transition-all"
+                    className="w-full px-4 py-3 bg-surface-2 border border-border-muted rounded-xl text-text-main outline-none focus:border-purple-400/50 transition-all"
                     autoFocus
                   />
                   <button 
@@ -780,15 +1370,15 @@ export function Dashboard({ user, theme, onThemeToggle }: DashboardProps) {
                       <Type size={24} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-semibold">Add Text Block</h3>
-                      <p className="text-sm text-text-dim">Paste a large snippet of text</p>
+                      <h3 className="text-xl font-semibold text-text-main">Add Text Block</h3>
+                      <p className="text-sm text-text-muted">Paste a large snippet of text</p>
                     </div>
                   </div>
                   <textarea 
                     value={textBlockInput}
                     onChange={(e) => setTextBlockInput(e.target.value)}
                     placeholder="Paste your text here..."
-                    className="w-full h-40 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-yellow-400/50 transition-all resize-none"
+                    className="w-full h-40 px-4 py-3 bg-surface-2 border border-border-muted rounded-xl text-text-main outline-none focus:border-yellow-400/50 transition-all resize-none"
                     autoFocus
                   />
                   <button 

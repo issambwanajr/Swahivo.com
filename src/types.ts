@@ -4,7 +4,7 @@ export interface User {
   name: string;
   password?: string; // Stored in localStorage for mock auth
   role: 'user' | 'admin';
-  createdAt: string;
+  created_at: string;
 }
 
 export interface BotConfig {
@@ -69,21 +69,40 @@ export interface Note {
   created_at: string;
 }
 
-export interface Workspace {
+export interface Project {
   id: string;
   user_id: string;
   name: string;
   description?: string;
+  category?: 'marketing' | 'blog' | 'chatbot' | 'dev' | 'other';
+  members?: { user_id: string, role: 'admin' | 'editor' | 'viewer' }[];
+  usage?: {
+    tokens: number;
+    credits: number;
+    last_active: string;
+  };
+  created_at: string;
+}
+
+export interface ProjectOutput {
+  id: string;
+  project_id: string;
+  type: 'text' | 'image' | 'code' | 'voice' | 'chat_history';
+  title: string;
+  content: string;
+  metadata?: any;
   created_at: string;
 }
 
 export interface WorkspaceDocument {
   id: string;
-  workspace_id: string;
+  project_id: string;
   user_id: string;
   title: string;
-  type: 'pdf' | 'url' | 'text';
+  type: 'pdf' | 'url' | 'text' | 'note';
   content: string;
+  summary?: string;
+  status?: 'indexing' | 'ready' | 'error';
   metadata?: any;
   created_at: string;
 }

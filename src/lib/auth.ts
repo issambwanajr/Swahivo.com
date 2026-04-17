@@ -18,7 +18,7 @@ export const getGuestUser = (): User => ({
   email: 'guest@swahivo.ai',
   name: 'Guest User',
   role: 'user',
-  createdAt: new Date().toISOString(),
+  created_at: new Date().toISOString(),
 });
 
 export const getCurrentUser = (): User | null => {

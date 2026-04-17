@@ -27,7 +27,7 @@ import Markdown from 'react-markdown';
 // Set up PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
-interface NoteFlowProps {
+interface NoteflowProps {
   user: any;
   theme?: 'light' | 'dark';
   onBack?: () => void;
@@ -40,7 +40,7 @@ interface Source {
   image_path?: string;
 }
 
-export function NoteFlow({ user, theme, onBack }: NoteFlowProps) {
+export function NoteFlow({ user, theme, onBack }: NoteflowProps) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string, sources?: Source[] }[]>([]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -118,11 +118,11 @@ export function NoteFlow({ user, theme, onBack }: NoteFlowProps) {
             }],
             config: {
               taskType: "RETRIEVAL_DOCUMENT" as any,
-              outputDimensionality: 1536
+              outputDimensionality: 512
             }
           });
 
-          ids.push(`noteflow-${uploadedFile.name}-${i}`);
+          ids.push(`newflow-${uploadedFile.name}-${i}`);
           embeddings.push(result.embeddings[0].values);
           metadatas.push({
             page_number: i,
@@ -134,7 +134,7 @@ export function NoteFlow({ user, theme, onBack }: NoteFlowProps) {
       }
 
       // Upsert to Chroma
-      await vectorStore.upsert('noteflow_knowledge', documents, metadatas, ids);
+      await vectorStore.upsert('newflow_knowledge', documents, metadatas, ids);
       
       setIsPdfLoaded(true);
       setIndexStatus(`Successfully indexed ${totalPages} pages`);
@@ -163,12 +163,12 @@ export function NoteFlow({ user, theme, onBack }: NoteFlowProps) {
         contents: [{ parts: [{ text: userMessage }] }],
         config: {
           taskType: "RETRIEVAL_QUERY" as any,
-          outputDimensionality: 1536
+          outputDimensionality: 512
         }
       });
 
       // 2. Search Chroma
-      const results = await vectorStore.query('noteflow_knowledge', userMessage, 5);
+      const results = await vectorStore.query('newflow_knowledge', userMessage, 5);
       
       const contextParts: string[] = [];
       const sources: Source[] = [];
@@ -191,7 +191,7 @@ export function NoteFlow({ user, theme, onBack }: NoteFlowProps) {
       const context = contextParts.join('\n\n---\n\n');
 
       // 3. Generate answer
-      const systemPrompt = `You are a helpful Note Flow Assistant. Answer the user's question based ONLY on the provided manual pages. 
+      const systemPrompt = `You are a helpful Noteflow Assistant. Answer the user's question based ONLY on the provided manual pages. 
 Be concise and clear. Use numbered steps when explaining procedures. Mention relevant page numbers in your answer.
 
 Manual content:
@@ -234,7 +234,7 @@ Question: ${userMessage}`;
           >
             <h2 className="text-2xl font-bold font-serif flex items-center gap-2">
               <FileText className="text-emerald-500" />
-              Note Flow
+              Noteflow
             </h2>
             <p className="text-xs text-text-dim">Multimodal RAG Assistant</p>
           </div>
@@ -311,7 +311,7 @@ Question: ${userMessage}`;
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
               <Sparkles size={48} className="text-emerald-500" />
               <div className="space-y-2">
-                <h4 className="text-xl font-serif">Welcome to Note Flow</h4>
+                <h4 className="text-xl font-serif">Welcome to Noteflow</h4>
                 <p className="text-sm max-w-xs">Upload your technical manuals or documents to start a multimodal conversation.</p>
               </div>
             </div>
@@ -393,7 +393,7 @@ Question: ${userMessage}`;
             </button>
           </div>
           <p className="text-[10px] text-center text-text-dim mt-4">
-            Note Flow uses multimodal embeddings to understand both text and diagrams in your documents.
+            Newflow uses multimodal embeddings to understand both text and diagrams in your documents.
           </p>
         </div>
       </main>
