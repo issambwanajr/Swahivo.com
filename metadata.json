@@ -1,5 +1,0 @@
-{
-  "name": "Noteflow",
-  "description": "Noteflow - Advanced AI Research Tool & Thinking Partner with Multi-source RAG.",
-  "requestFramePermissions": ["microphone"]
-}
